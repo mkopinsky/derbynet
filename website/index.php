@@ -16,166 +16,278 @@ require_once('inc/authorize.inc');
 // a database).  The pdo may get created OK, but then fail on the first attempt
 // to access.
 try {
-  $schema_version = schema_version();
+    $schema_version = schema_version();
 } catch (PDOException $p) {
-  $_SESSION['setting_up'] = 1;
-  header('Location: setup.php');
-  exit();
+    $_SESSION['setting_up'] = 1;
+    header('Location: setup.php');
+    exit();
 }
 session_write_close();
 
 $show_voting_button =
-  $schema_version >= BALLOTING_SCHEMA &&
-  read_single_value('SELECT COUNT(*) FROM BallotAwards') > 0;
-
-// Returns true if we actually showed a button
-function make_link_button($label, $link, $permission, $button_class) {
-  if (have_permission($permission)) {
-    echo "<a class='button_link ".$button_class."' href='".$link."'>".$label."</a>\n";
-    echo "<br/>\n";
-    return true;
-  } else {
-    return false;
-  }
-}
-
-function make_spacer_if($cond) {
-  if ($cond) {
-    echo "<div class='index_spacer'>&nbsp;</div>\n";
-  }
-}
+        $schema_version >= BALLOTING_SCHEMA &&
+        read_single_value('SELECT COUNT(*) FROM BallotAwards') > 0;
 
 ?><!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-<title>Pinewood Derby Race Information</title>
-<?php require('inc/stylesheet.inc'); ?>
-<script type="text/javascript" src="js/jquery.js"></script>
-<script type="text/javascript" src="js/modal.js"></script>
-<style type="text/css">
-div.index_spacer {
-  height: 40px;
-}
 
-div.index_background {
-  width: 100%;
-}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pinewood Derby Race Information</title>
+    <?php require('inc/stylesheet.inc'); ?>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <script type="text/javascript" src="js/jquery.js"></script>
+    <script type="text/javascript" src="js/modal.js"></script>
 
-div.index_column {
-  width: 50%;
-  display: inline-block;
-  float: left;
-}
+    <style>
+        body {
+            background: #f5f6f8;
+        }
 
-.block_buttons a.button_link {
-  width: 238px;
-  height: 30px;
-}
+        .card-link {
+            text-decoration: none;
+            color: inherit;
+        }
 
-.block_buttons a.button_link.before_button,
-.block_buttons input.before_button[type='submit'] {
-  color: #ffffcc;
-}
-.block_buttons a.button_link.during_button,
-.block_buttons input.during_button[type='submit'] {
-  color: #ddffdd;
-}
-.block_buttons a.button_link.after_button,
-.block_buttons input.after_button[type='submit'] {
-  color: #ddddff;
-}
-.block_buttons a.button_link.other_button,
-.block_buttons input.other_button[type='submit'] {
-  color: #ffddff;
-}
-</style>
+        .dashboard-card {
+            transition: .15s;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, .15);
+        }
+
+        .section-title {
+            margin-top: 35px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        :root {
+            --bs-primary: #023882;
+            --bs-primary-rgb: 2, 56, 130;
+        }
+    </style>
 </head>
+
 <body>
-<?php
-  make_banner('', /* back_button */ false);
+<!-- HEADER -->
+<nav class="navbar navbar-dark bg-primary px-3">
+    <div class="navbar-brand fw-bold">
+        🏎 DerbyNet
+    </div>
+    <!-- TODO remove - this is fake text that's just here for a mockup -->
+    <div class="text-white text-center flex-grow-1 small">
+        Pack 234 · Springfield Community Center · April 27, 2024
+    </div>
+    <?php if (@$_SESSION['role']): ?>
+        <div class="dropdown">
+            <a class="text-white dropdown-toggle text-decoration-none"
+               href="#"
+               role="button"
+               data-bs-toggle="dropdown"
+            >
+                Hello, <?php echo $_SESSION['role']; ?>
+            </a>
 
- $need_spacer = false;
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <a class="dropdown-item" href="login.php?logout">Log Out</a>
+                </li>
+            </ul>
+        </div>
+    <?php else: ?>
+        <a class="nav-link text-white" href="login.php">Log In</a>
+    <?php endif; ?>
+</nav>
 
- // This is a heuristic more than a hard rule -- when are there so many buttons that we need a second column?
- $two_columns = have_permission(SET_UP_PERMISSION);
 
-echo "<div class='index_background'>\n";
+<div class="container">
+    <!-- RACE PREP -->
+    <?php if (have_permission(SET_UP_PERMISSION) || have_permission(ASSIGN_RACER_IMAGE_PERMISSION)): ?>
+        <h4 class="section-title">Race Prep</h4>
+        <div class="row g-3">
+            <?php if (have_permission(SET_UP_PERMISSION)): ?>
+                <div class="col-md-6 col-lg-4">
+                    <a class="card dashboard-card card-link" href="setup.php">
+                        <div class="card-body">
+                            <h5 class="card-title">⚙️ Set-Up</h5>
+                        </div>
+                    </a>
+                </div>
+            <?php endif; ?>
+            <?php if (have_permission(ASSIGN_RACER_IMAGE_PERMISSION)): ?>
+                <div class="col-md-6 col-lg-4">
+                    <a class="card dashboard-card card-link" href="print.php">
+                        <div class="card-body">
+                            <h5 class="card-title">🖨 Printables</h5>
+                        </div>
+                    </a>
+                </div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 
-if ($two_columns) {
-  echo "<div class='index_column'>\n";
-}
+    <!-- CHECK IN -->
+    <?php if (have_permission(CHECK_IN_RACERS_PERMISSION) || have_permission(ASSIGN_RACER_IMAGE_PERMISSION)): ?>
+        <h4 class="section-title">Check In</h4>
+        <div class="row g-3">
+            <?php if (have_permission(CHECK_IN_RACERS_PERMISSION)): ?>
+                <div class="col-md-6 col-lg-4">
+                    <a class="card dashboard-card card-link" href="checkin.php">
+                        <div class="card-body">
+                            <h5 class="card-title">✅ Race Check-In</h5>
+                        </div>
+                    </a>
+                </div>
+            <?php endif; ?>
+            <?php if (have_permission(ASSIGN_RACER_IMAGE_PERMISSION)): ?>
+                <div class="col-md-6 col-lg-4">
+                    <a class="card dashboard-card card-link" href="photo-thumbs.php?repo=head">
+                        <div class="card-body">
+                            <h5 class="card-title">📷 Racer Photos</h5>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <a class="card dashboard-card card-link" href="photo-thumbs.php?repo=car">
+                        <div class="card-body">
+                            <h5 class="card-title">🚗 Car Photos</h5>
+                        </div>
+                    </a>
+                </div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 
-echo "<div class='block_buttons'>\n";
+    <!-- RACING -->
+    <h4 class="section-title">Racing</h4>
+    <div class="row g-3">
+        <?php if (have_permission(SET_UP_PERMISSION)): ?>
+            <div class="col-md-6 col-lg-4">
+                <a class="card dashboard-card card-link" href="coordinator.php">
+                    <div class="card-body">
+                        <h5 class="card-title">🏁 Race Dashboard</h5>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <a class="card dashboard-card card-link" href="kiosk-dashboard.php">
+                    <div class="card-body">
+                        <h5 class="card-title">🖥 Kiosk Dashboard</h5>
+                    </div>
+                </a>
+            </div>
+        <?php endif; ?>
+        <?php if (have_permission(JUDGING_PERMISSION)): ?>
+            <div class="col-md-6 col-lg-4">
+                <a class="card dashboard-card card-link" href="judging.php">
+                    <div class="card-body">
+                        <h5 class="card-title">⭐ Judging</h5>
+                    </div>
+                </a>
+            </div>
+        <?php endif; ?>
 
-// *********** Before ***************
-$need_spacer = make_link_button('Set-Up', 'setup.php', SET_UP_PERMISSION, 'before_button');
-$need_spacer = make_link_button('Race Check-In', 'checkin.php', CHECK_IN_RACERS_PERMISSION, 'before_button') || $need_spacer;
-if (have_permission(ASSIGN_RACER_IMAGE_PERMISSION)) {
-  if ($schema_version > 1) {
-    echo "<div class='double'>";
-    echo "<a class='button_link left before_button' href='photo-thumbs.php?repo=head'><b>Racer</b><br/>Photos</a>\n";
-    echo "<a class='button_link right before_button' href='photo-thumbs.php?repo=car'><b>Car</b><br/>Photos</a>\n";
-    echo "</div>";
-  } else {
-    $need_spacer = make_link_button('Edit Racer Photos', 'photo-thumbs.php?repo=head', ASSIGN_RACER_IMAGE_PERMISSION, 'before_button') || $need_spacer;
-  }
-}
+        <?php if (!have_permission(SET_UP_PERMISSION) && have_permission(VIEW_RACE_RESULTS_PERMISSION)): ?>
+            <div class="col-md-6 col-lg-4">
+                <a class="card dashboard-card card-link" href="slideshow.php">
+                    <div class="card-body">
+                        <h5 class="card-title">📽️ Slideshow</h5>
+                    </div>
+                </a>
+            </div>
+            <?php if ($show_voting_button): ?>
+                <div class="col-md-6 col-lg-4">
+                    <a class="card dashboard-card card-link" href="vote.php">
+                        <div class="card-body">
+                            <h5 class="card-title">🗳️ Vote</h5>
+                        </div>
+                    </a>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
+        <div class="col-md-6 col-lg-4">
+            <a class="card dashboard-card card-link" href="ondeck.php">
+                <div class="card-body">
+                    <h5 class="card-title">👥 Racers On Deck</h5>
+                </div>
+            </a>
+        </div>
+    </div>
 
-make_spacer_if($need_spacer);
+    <!-- RESULTS -->
+    <h4 class="section-title">Results</h4>
+    <div class="row g-3">
+        <?php if (have_permission(VIEW_RACE_RESULTS_PERMISSION)): ?>
+            <div class="col-md-6 col-lg-4">
+                <a class="card dashboard-card card-link" href="racer-results.php">
+                    <div class="card-body">
+                        <h5 class="card-title">📄 Results By Racer</h5>
+                    </div>
+                </a>
+            </div>
+        <?php endif; ?>
+        <?php if (have_permission(PRESENT_AWARDS_PERMISSION)): ?>
+            <div class="col-md-6 col-lg-4">
+                <a class="card dashboard-card card-link" href="awards-presentation.php">
+                    <div class="card-body">
+                        <h5 class="card-title">🏆 Present Awards</h5>
+                    </div>
+                </a>
+            </div>
+        <?php endif; ?>
+        <?php if (have_permission(VIEW_AWARDS_PERMISSION)): ?>
+            <div class="col-md-6 col-lg-4">
+                <a class="card dashboard-card card-link" href="standings.php">
+                    <div class="card-body">
+                        <h5 class="card-title">📊 Standings</h5>
+                    </div>
+                </a>
+            </div>
+        <?php endif; ?>
+        <?php if (have_permission(VIEW_RACE_RESULTS_PERMISSION)): ?>
+            <div class="col-md-6 col-lg-4">
+                <a class="card dashboard-card card-link" href="export.php">
+                    <div class="card-body">
+                        <h5 class="card-title">⬇ Export Results</h5>
+                    </div>
+                </a>
+            </div>
+        <?php endif; ?>
+        <?php if (have_permission(SET_UP_PERMISSION)): ?>
+            <div class="col-md-6 col-lg-4">
+                <a class="card dashboard-card card-link" href="history.php">
+                    <div class="card-body">
+                        <h5 class="card-title">🔁 Retrospective</h5>
+                    </div>
+                </a>
+            </div>
+        <?php endif; ?>
+    </div>
 
-// *********** During ***************
-$need_spacer = make_link_button('Race Dashboard', 'coordinator.php', SET_UP_PERMISSION, 'during_button');
-$need_spacer = make_link_button('Kiosk Dashboard', 'kiosk-dashboard.php', SET_UP_PERMISSION, 'during_button') || $need_spacer;
-$need_spacer = make_link_button('Judging', 'judging.php', JUDGING_PERMISSION, 'during_button') || $need_spacer;
-if (!have_permission(SET_UP_PERMISSION)) {
-  $need_spacer = make_link_button('Slideshow', 'slideshow.php', VIEW_RACE_RESULTS_PERMISSION, 'during_button') || $need_spacer;
-  if ($show_voting_button) {
-    $need_spacer = make_link_button('Vote!', 'vote.php', VIEW_RACE_RESULTS_PERMISSION, 'during_button') || $need_spacer;
-  }
-}
 
-// *********** During, part 2 ***************
-$need_spacer = make_link_button('Racers On Deck', 'ondeck.php', -1, 'during_button') || $need_spacer;
-$need_spacer = make_link_button('Results By Racer', 'racer-results.php', VIEW_RACE_RESULTS_PERMISSION, 'during_button')
-    || $need_spacer;
+    <!-- FOOTER -->
 
-// end first column default set-up
+    <footer class="text-center mt-5">
+        <div class="mb-2">
+            <a class="btn btn-outline-secondary btn-sm me-2" href="https://derbynet.org/builds/docs.php">
+                Help
+            </a>
+            <a class="btn btn-outline-secondary btn-sm" href="about.php">
+                About
+            </a>
+        </div>
 
-if ($two_columns) {
-  echo "</div>\n";  // block_buttons
-  echo "</div>\n";  // index_column
+        <div class="text-muted small">
+            DerbyNet · Open Source Pinewood Derby Race Management
+        </div>
+    </footer>
+</div>
 
-  echo "<div class='index_column'>\n";
-  echo "<div class='block_buttons'>\n";
-}
 
-// *********** After ***************
-$need_spacer = make_link_button('Present Awards', 'awards-presentation.php', PRESENT_AWARDS_PERMISSION, 'after_button');
-$need_spacer = make_link_button('Standings', 'standings.php', VIEW_AWARDS_PERMISSION, 'after_button') || $need_spacer;
-$need_spacer = make_link_button('Export Results', 'export.php', VIEW_RACE_RESULTS_PERMISSION, 'after_button') || $need_spacer;
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-$need_spacer = make_link_button('Retrospective', 'history.php', SET_UP_PERMISSION, 'after_button') || $need_spacer;
-
-make_spacer_if($need_spacer);
-
-// *********** Other ***************
-make_link_button('Printables', 'print.php', ASSIGN_RACER_IMAGE_PERMISSION, 'other_button');
-make_link_button('About', 'about.php', -1, 'other_button');
-
-if (@$_SESSION['role']) {
-  make_link_button('Log out', 'login.php?logout', -1, 'other_button');
-} else {
-  make_link_button('Log in', 'login.php', -1, 'other_button');
-}
-
-echo "</div>\n";  // block_buttons
-if ($two_columns) {
-  echo "</div>\n";  // index_column
-}
-
-echo "</div>\n";  // index_background
-echo "</body>\n";
-echo "</html>\n";
-?>
-
+</body>
+</html>
